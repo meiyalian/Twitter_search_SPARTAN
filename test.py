@@ -45,8 +45,6 @@ def locate_coord(grids, coord):
 
 
 
-
-
 class Node:
     def __init__(self, value):
         self.val = value
@@ -55,7 +53,6 @@ class Node:
         self.score = 0
         self.is_word = False
     
-
 
 class Trie:
     def __init__(self):
@@ -100,12 +97,13 @@ class ScoreCounter:
         matched_score = 0 
         current_index = 0 
         word_len = 0
-        exception = "\"\'?! ,."
+        exception = "\"\'‘“?! ,."
         current_node = self.trie.root
         while current_index < len(sentence):
             current_char = current_node.children.get(sentence[current_index]) 
             if current_char is None :
                 if matched_index != -1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception) and ( sentence[matched_index+1] in exception ):
+                    #print(sentence[matched_index-word_len+1: matched_index+1])
                     score += matched_score
                     current_index = matched_index + 1 
                     matched_index = -1
@@ -122,6 +120,7 @@ class ScoreCounter:
                     word_len = current_char.index
                 
                     if current_index == len(sentence)-1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception):
+                        #print(sentence[matched_index-word_len+1: matched_index+1])
                         score += matched_score
                 
                 current_index +=1
@@ -129,39 +128,12 @@ class ScoreCounter:
         return score
 
 
-
-
-
-
-
-
-    
-
-            
-        
-
 if __name__ == "__main__":  
-    # grids = parse_grid("melbGrid.json")
-    # print([g["id"] for g in grids])
-    # print(locate_coord(grids, [145.3, -37.8]))
-    # t = Trie()
-    # t.add_word("apple", 3)
-    # t.add_word("appl", 4)
-    # print(t.root.children["a"].children["p"].children["p"].children["l"].children["e"].index)
-
-    # find_score = re.compile(r'[-+]?[0-9]+')  # 查找正负数字
-    # find_word = re.compile('[^-\d\t\n]+')  # 查找词
-    # with open("AFINN.txt") as f:
-    #     for line in f:
-    #         word = find_word.findall(line)
-    #         score = find_score.findall(line)
-    #         print(word[0], ": ", score[0])
-
     counter = ScoreCounter()
     counter.process_dict("AFINN.txt")
     # print(counter.countScore("aBandoabandon"))
     # print(counter.countScore("can't stand abandon."))
-    print(counter.countScore("can't stand abandon.....@!abandon."))
+    print(counter.countScore("Happy \"love. I abandon easy/ easy does not work not Good' cool stuff cool better!@  good@! pretty.nice Bad. BaD"))
 
  
             
