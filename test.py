@@ -1,9 +1,44 @@
-# from mpi4py import MPI
+from mpi4py import MPI
 import json
 import re
+import sys
 
-# comm = MPI.COMM_WORLD
-# size = MPI_comm.Get_size()
+GRID_FILE = "melbGrid.json"
+DICTIONARY = "AFINN.txt"
+
+def convert_to_json(line_number, data ):
+    if line_number > 0: #ignore the first line of file 
+        data = data.strip()
+        if data[-2] == "]":
+            data = data[:-2]
+        else:
+            data = data[:-1]
+        return data
+
+
+
+def process_tweets(data_file, rank, no_of_process, grids_arr, score_counter ):
+    statistics = dict()
+    for grid in grids_arr:
+        statistics[grid["id"]] = [0,0] # each cell in dict stores [number_of_tweets, overall_score ]
+
+    with open(data_file) as f:
+        for i, line in enumerate(f):
+            if i % no_of_process == rank:
+                try:
+                    tweet = convert_to_json(i, line)
+                    if tweet is not None: 
+                        tweet = json.loads(tweet)
+                        location = locate_coord(grids_arr, tweet["value"]["geometry"]["coordinates"])
+                        if location is not None:
+                            score = score_counter.countScore(tweet["value"]["properties"]["text"])
+                            previous = statistics.get(location)
+                            statistics[location] = [previous[0]+1, previous[1]+score ]
+            
+                except ValueError:
+                    print("line number: ", i, ", \nMalfomred json: " ,line)
+
+        return statistics
 
 
 
@@ -21,8 +56,6 @@ def parse_grid(fname):
 
     return grids
 
-
-
 def locate_coord(grids, coord):
     i = 0
     j = -1
@@ -32,16 +65,13 @@ def locate_coord(grids, coord):
             while j < len(grids) and grids[j]["xmin"] == grids[i]["xmin"]:
                 j+=1 
             break
-            
         i +=1
     
-    if j == -1: #outside of range 
-        return ""
-    
-    for each in grids[i:j]:
-        if coord[1] >= each["ymin"] and coord[1] <= each["ymax"] :
-            return each["id"]
-    return ""
+    if j != -1: #if not outside of range 
+        for each in grids[i:j]:
+            if coord[1] >= each["ymin"] and coord[1] <= each["ymax"] :
+                return each["id"]
+
 
 
 
@@ -128,12 +158,57 @@ class ScoreCounter:
         return score
 
 
-if __name__ == "__main__":  
+
+def main(argv):
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    
+    try:
+        f = open(argv[0], "r")
+    except ValueError:
+        print("please enter the correct file path of the tweet data to process.")
+        sys.exit()
+
+    #all processes need to process the grid & dict information 
+    grids = parse_grid(GRID_FILE)
     counter = ScoreCounter()
-    counter.process_dict("AFINN.txt")
-    # print(counter.countScore("aBandoabandon"))
-    # print(counter.countScore("can't stand abandon."))
-    print(counter.countScore("Happy \"love. I abandon easy/ easy does not work not Good' cool stuff cool better!@  good@! pretty.nice Bad. BaD"))
+    counter.process_dict(DICTIONARY)
+    sta = process_tweets(argv[0], rank, size, grids, counter)
+
+    if rank == 0: # master process
+        print("this is rank: ", rank )
+        for i in range(1, size):
+            partial_sta = comm.recv(source=i)
+            for key in partial_sta:
+                prev = sta.get(key)
+                partial = partial_sta.get(key)
+                sta[key] = [ prev[0] + partial[0], prev[1] + partial[1]] 
+        
+        #print final results
+        print("Cell      ","#Total Tweets      ", "#Overal Sentiment Score")
+        for key in sta:
+            value = sta.get(key)
+            print(key, "     ", value[0], "     ",  value[1])
+           
+
+    else:
+        print("this is rank: ", rank )
+        comm.send(sta, dest=0)
+    
+
+
+
+
+if __name__ == "__main__":  
+    main(sys.argv[1:])
+
+    
+          
+  
+
+                
+
 
  
             
