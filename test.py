@@ -12,7 +12,8 @@ def convert_to_json(line_number, data ):
         if data[-2] == "]":
             data = data[:-2]
         else:
-            data = data[:-1]
+            if data[-1] == ",":
+                data = data[:-1]
         return data
 
 
