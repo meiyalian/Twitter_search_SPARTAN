@@ -32,9 +32,10 @@ def process_tweets(data_file, rank, no_of_process, grids_arr, score_counter ):
                         tweet = json.loads(tweet)
                         location = locate_coord(grids_arr, tweet["value"]["geometry"]["coordinates"])
                         if location is not None:
-                            score = score_counter.countScore(tweet["value"]["properties"]["text"])
+                            score,has_match = score_counter.countScore(tweet["value"]["properties"]["text"])
                             previous = statistics.get(location)
-                            statistics[location] = [previous[0]+1, previous[1]+score ]
+                            if has_match:
+                                statistics[location] = [previous[0]+1, previous[1]+score ]
             
                 except ValueError:
                     print("line number: ", i, ", \nMalfomred json: " ,line)
@@ -58,20 +59,23 @@ def parse_grid(fname):
     return grids
 
 def locate_coord(grids, coord):
-    i = 0
-    j = -1
-    while i < len(grids):
-        if coord[0] >= grids[i]["xmin"] and coord[0]<= grids[i]["xmax"]:
-            j = i 
-            while j < len(grids) and grids[j]["xmin"] == grids[i]["xmin"]:
-                j+=1 
-            break
-        i +=1
+    # i = 0
+    # j = -1
+    # while i < len(grids):
+    #     if coord[0] >= grids[i]["xmin"] and coord[0]<= grids[i]["xmax"]:
+    #         j = i 
+    #         while j < len(grids) and grids[j]["xmin"] == grids[i]["xmin"]:
+    #             j+=1 
+    #         break
+    #     i +=1
     
-    if j != -1: #if not outside of range 
-        for each in grids[i:j]:
-            if coord[1] >= each["ymin"] and coord[1] <= each["ymax"] :
-                return each["id"]
+    # if j != -1: #if not outside of range 
+    #     for each in grids[i:j]:
+    #         if coord[1] >= each["ymin"] and coord[1] <= each["ymax"] :
+    #             return each["id"]
+    for i in range(len(grids)):
+        if coord[0]>= grids[i]["xmin"] and coord[0] <=grids[i]["xmax"] and coord[1]>=grids[i]["ymin"] and coord[1] <= grids[i]["ymax"]:
+            return grids[i]["id"]
 
 
 
@@ -128,6 +132,7 @@ class ScoreCounter:
         matched_score = 0 
         current_index = 0 
         word_len = 0
+        has_match = False
         exception = "\"\'‘“?! ,."
         current_node = self.trie.root
         while current_index < len(sentence):
@@ -138,6 +143,7 @@ class ScoreCounter:
                     score += matched_score
                     current_index = matched_index + 1 
                     matched_index = -1
+                    has_match = True
 
                 else:
                     current_index +=1
@@ -153,14 +159,16 @@ class ScoreCounter:
                     if current_index == len(sentence)-1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception):
                         #print(sentence[matched_index-word_len+1: matched_index+1])
                         score += matched_score
+                        has_match = True
                 
                 current_index +=1
                 current_node = current_char
-        return score
+        return score, has_match
 
 
 
 def main(argv):
+   
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()
@@ -171,6 +179,7 @@ def main(argv):
         print("please enter the correct file path of the tweet data to process.")
         sys.exit()
 
+    runtime = MPI.Wtime()
     #all processes need to process the grid & dict information 
     grids = parse_grid(GRID_FILE)
     counter = ScoreCounter()
@@ -178,7 +187,7 @@ def main(argv):
     sta = process_tweets(argv[0], rank, size, grids, counter)
 
     if rank == 0: # master process
-        print("this is rank: ", rank )
+        # print("this is rank: ", rank )
         for i in range(1, size):
             partial_sta = comm.recv(source=i)
             for key in partial_sta:
@@ -186,15 +195,17 @@ def main(argv):
                 partial = partial_sta.get(key)
                 sta[key] = [ prev[0] + partial[0], prev[1] + partial[1]] 
         
+        runtime = MPI.Wtime() - runtime
         #print final results
         print("Cell      ","#Total Tweets      ", "#Overal Sentiment Score")
         for key in sta:
             value = sta.get(key)
             print(key, "     ", value[0], "     ",  value[1])
-           
+        
+        print("Total run time: ", runtime, " seconds.")
 
     else:
-        print("this is rank: ", rank )
+        # print("this is rank: ", rank )
         comm.send(sta, dest=0)
     
 
@@ -202,7 +213,12 @@ def main(argv):
 
 
 if __name__ == "__main__":  
-    main(sys.argv[1:])
+    # main(sys.argv[1:])
+    grids = parse_grid(GRID_FILE)
+    print(locate_coord(grids, [145.1,-37.95]))
+
+
+
 
     
           
