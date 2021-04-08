@@ -1,10 +1,8 @@
 from mpi4py import MPI
 import json
-import re
 import sys
 
-GRID_FILE = "melbGrid.json"
-DICTIONARY = "AFINN.txt"
+
 
 def convert_to_json(line_number, data ):
     if line_number > 0: #ignore the first line of file 
@@ -58,20 +56,6 @@ def parse_grid(fname):
     return grids
 
 def locate_coord(grids, coord):
-    # i = 0
-    # j = -1
-    # while i < len(grids):
-    #     if coord[0] >= grids[i]["xmin"] and coord[0]<= grids[i]["xmax"]:
-    #         j = i 
-    #         while j < len(grids) and grids[j]["xmin"] == grids[i]["xmin"]:
-    #             j+=1 
-    #         break
-    #     i +=1
-    
-    # if j != -1: #if not outside of range 
-    #     for each in grids[i:j]:
-    #         if coord[1] >= each["ymin"] and coord[1] <= each["ymax"] :
-    #             return each["id"]
     for i in range(len(grids)):
         if coord[0]>= grids[i]["xmin"] and coord[0] <=grids[i]["xmax"] and coord[1]>=grids[i]["ymin"] and coord[1] <= grids[i]["ymax"]:
             return grids[i]["id"]
@@ -80,8 +64,8 @@ def locate_coord(grids, coord):
 
 
 class Node:
-    def __init__(self, value):
-        self.val = value
+    def __init__(self):
+        # self.val = value
         self.children = dict()
         self.index = 0 
         self.score = 0
@@ -90,14 +74,14 @@ class Node:
 
 class Trie:
     def __init__(self):
-        self.root = Node(None)
+        self.root = Node()
     
     def add_word(self, word, score):
         current_node = self.root
         for i in range(len(word)):
             next_node = current_node.children.get(word[i])
             if next_node is None:
-                new_node =  Node(word[i])
+                new_node =  Node()
                 new_node.index = i + 1 
                 current_node.children[word[i]] =new_node
                 current_node = new_node
@@ -106,6 +90,9 @@ class Trie:
 
         current_node.score = score
         current_node.is_word = True
+
+
+
 
 
 class ScoreCounter:
@@ -132,7 +119,7 @@ class ScoreCounter:
         current_index = 0 
         word_len = 0
         # has_match = False
-        exception = "\"\'‘’“”?! ,."
+        exception = "\"\'‘’“”?! ,.，。"
         current_node = self.trie.root
         while current_index < len(sentence):
             current_char = current_node.children.get(sentence[current_index]) 
@@ -142,12 +129,14 @@ class ScoreCounter:
                     score += matched_score
                     current_index = matched_index + 1 
                     matched_index = -1
-                    # has_match = True
 
                 else:
-                    current_index +=1
-                    while current_index < len(sentence) and (not sentence[current_index-1] in exception):
+                    if sentence[current_index-1] in exception and current_node!= self.trie.root:
+                        pass
+                    else:
                         current_index +=1
+                        while current_index < len(sentence) and (not (sentence[current_index-1] in exception)):
+                            current_index +=1
                 current_node = self.trie.root
             else:
                 if current_char.is_word:
@@ -158,7 +147,6 @@ class ScoreCounter:
                     if current_index == len(sentence)-1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception):
                         #print(sentence[matched_index-word_len+1: matched_index+1])
                         score += matched_score
-                        # has_match = True
                 
                 current_index +=1
                 current_node = current_char
@@ -171,18 +159,12 @@ def main(argv):
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()
-    
-    # try:
-    #     f = open(argv[0], "r")
-    # except ValueError:
-    #     print("please enter the correct file path of the tweet data to process.")
-    #     sys.exit()
 
-    runtime = MPI.Wtime()
+    # runtime = MPI.Wtime()
     #all processes need to process the grid & dict information 
-    grids = parse_grid(GRID_FILE)
+    grids = parse_grid("melbGrid.json")
     counter = ScoreCounter()
-    counter.process_dict(DICTIONARY)
+    counter.process_dict("AFINN.txt")
     sta = process_tweets(argv[0], rank, size, grids, counter)
 
     if rank == 0: # master process
@@ -192,16 +174,16 @@ def main(argv):
             for key in partial_sta:
                 prev = sta.get(key)
                 partial = partial_sta.get(key)
-                sta[key] = [ prev[0] + partial[0], prev[1] + partial[1]] 
+                sta[key] = [prev[0] + partial[0], prev[1] + partial[1]] 
         
-        runtime = MPI.Wtime() - runtime
+        # runtime = MPI.Wtime() - runtime
         #print final results
         print("Cell      ","#Total Tweets      ", "#Overal Sentiment Score")
-        for key in sta:
+        for key in sorted(sta):
             value = sta.get(key)
-            print(key, "     ", value[0], "     ",  value[1])
+            print(key, "            ", value[0], "                             ",  value[1])
         
-        print("Total run time: ", runtime, " seconds.")
+        # print("Total run time: ", runtime, " seconds.")
 
     else:
         # print("this is rank: ", rank )
@@ -212,7 +194,11 @@ def main(argv):
 
 
 if __name__ == "__main__":  
-    main(sys.argv[1:])
+    # main(sys.argv[1:])
+    grids = parse_grid("melbGrid.json")
+    for each in grids:
+        print(each)
+
 
 
 
