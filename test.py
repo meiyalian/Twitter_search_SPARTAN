@@ -194,10 +194,8 @@ def main(argv):
 
 
 if __name__ == "__main__":  
-    # main(sys.argv[1:])
-    grids = parse_grid("melbGrid.json")
-    for each in grids:
-        print(each)
+    main(sys.argv[1:])
+   
 
 
 
