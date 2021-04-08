@@ -32,10 +32,9 @@ def process_tweets(data_file, rank, no_of_process, grids_arr, score_counter ):
                         tweet = json.loads(tweet)
                         location = locate_coord(grids_arr, tweet["value"]["geometry"]["coordinates"])
                         if location is not None:
-                            score,has_match = score_counter.countScore(tweet["value"]["properties"]["text"])
+                            score = score_counter.countScore(tweet["value"]["properties"]["text"])
                             previous = statistics.get(location)
-                            if has_match:
-                                statistics[location] = [previous[0]+1, previous[1]+score ]
+                            statistics[location] = [previous[0]+1, previous[1]+score ]
             
                 except ValueError:
                     print("line number: ", i, ", \nMalfomred json: " ,line)
@@ -132,8 +131,8 @@ class ScoreCounter:
         matched_score = 0 
         current_index = 0 
         word_len = 0
-        has_match = False
-        exception = "\"\'‘“?! ,."
+        # has_match = False
+        exception = "\"\'‘’“”?! ,."
         current_node = self.trie.root
         while current_index < len(sentence):
             current_char = current_node.children.get(sentence[current_index]) 
@@ -143,7 +142,7 @@ class ScoreCounter:
                     score += matched_score
                     current_index = matched_index + 1 
                     matched_index = -1
-                    has_match = True
+                    # has_match = True
 
                 else:
                     current_index +=1
@@ -159,11 +158,11 @@ class ScoreCounter:
                     if current_index == len(sentence)-1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception):
                         #print(sentence[matched_index-word_len+1: matched_index+1])
                         score += matched_score
-                        has_match = True
+                        # has_match = True
                 
                 current_index +=1
                 current_node = current_char
-        return score, has_match
+        return score
 
 
 
@@ -173,11 +172,11 @@ def main(argv):
     size = comm.Get_size()
     rank = comm.Get_rank()
     
-    try:
-        f = open(argv[0], "r")
-    except ValueError:
-        print("please enter the correct file path of the tweet data to process.")
-        sys.exit()
+    # try:
+    #     f = open(argv[0], "r")
+    # except ValueError:
+    #     print("please enter the correct file path of the tweet data to process.")
+    #     sys.exit()
 
     runtime = MPI.Wtime()
     #all processes need to process the grid & dict information 
@@ -213,9 +212,8 @@ def main(argv):
 
 
 if __name__ == "__main__":  
-    # main(sys.argv[1:])
-    grids = parse_grid(GRID_FILE)
-    print(locate_coord(grids, [145.1,-37.95]))
+    main(sys.argv[1:])
+
 
 
 
