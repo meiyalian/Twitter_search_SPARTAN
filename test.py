@@ -194,13 +194,8 @@ def main(argv):
 
 
 if __name__ == "__main__":  
-    # main(sys.argv[1:])
-    grids = parse_grid("melbGrid.json")
-    print (locate_coord(grids,[145,-37.95]))
-    print (locate_coord(grids,[145,-38]))
-    print (locate_coord(grids,[145,-38.1]))
-    print (locate_coord(grids,[145.15,-38.1]))
-    print (locate_coord(grids,[145.15,-38]))
+    main(sys.argv[1:])
+ 
 
    
 
