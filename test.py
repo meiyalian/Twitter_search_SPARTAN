@@ -35,7 +35,7 @@ def process_tweets(data_file, rank, no_of_process, grids_arr, score_counter ):
                             statistics[location] = [previous[0]+1, previous[1]+score ]
             
                 except ValueError:
-                    print("line number: ", i, ", \nMalfomred json: " ,line)
+                    pass
 
         return statistics
 
@@ -194,7 +194,14 @@ def main(argv):
 
 
 if __name__ == "__main__":  
-    main(sys.argv[1:])
+    # main(sys.argv[1:])
+    grids = parse_grid("melbGrid.json")
+    print (locate_coord(grids,[145,-37.95]))
+    print (locate_coord(grids,[145,-38]))
+    print (locate_coord(grids,[145,-38.1]))
+    print (locate_coord(grids,[145.15,-38.1]))
+    print (locate_coord(grids,[145.15,-38]))
+
    
 
 
