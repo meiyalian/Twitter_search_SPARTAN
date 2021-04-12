@@ -5,9 +5,9 @@ import sys
 
 
 def convert_to_json(line_number, data ):
-     """
+    """
         convert a line in the twitter data file into json format 
-     """
+    """
     if line_number > 0: #ignore the first line of file 
         data = data.strip()
         if data[-2] == "]":
@@ -158,36 +158,45 @@ class ScoreCounter:
         matched_score = 0 
         current_index = 0 
         word_len = 0
+        next_starting_index = -1 
         exception = "\"\'‘’“”?! ,.，。"
         current_node = self.trie.root
         while current_index < len(sentence):
-            current_char = current_node.children.get(sentence[current_index]) 
-            if current_char is None :
+            current_char = sentence[current_index]
+            current_node = current_node.children.get(current_char) 
+
+            if current_node is None :
                 if matched_index != -1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception) and ( sentence[matched_index+1] in exception ):
+        
                     score += matched_score
                     current_index = matched_index + 1 
                     matched_index = -1
 
                 else:
-                    if sentence[current_index-1] in exception and current_node!= self.trie.root:
-                        pass
+                    if next_starting_index != -1:
+                        current_index = next_starting_index
+                        next_starting_index = -1
                     else:
                         current_index +=1
                         while current_index < len(sentence) and (not (sentence[current_index-1] in exception)):
                             current_index +=1
                 current_node = self.trie.root
             else:
-                if current_char.is_word:
+                if current_node.is_word:
                     matched_index = current_index
-                    matched_score = current_char.score
-                    word_len = current_char.index
+                    matched_score = current_node.score
+                    word_len = current_node.index
                 
                     if current_index == len(sentence)-1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception):
                         score += matched_score
                 
+                if current_char.isspace() and next_starting_index == -1:
+                    next_starting_index = current_index + 1 
+
                 current_index +=1
-                current_node = current_char
+              
         return score
+
 
     
 
