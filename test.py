@@ -21,7 +21,7 @@ def process_tweets(data_file, rank, no_of_process, grids_arr, score_counter ):
     for grid in grids_arr:
         statistics[grid["id"]] = [0,0] # each cell in dict stores [number_of_tweets, overall_score ]
 
-    with open(data_file) as f:
+    with open(data_file, "r") as f:
         for i, line in enumerate(f):
             if i % no_of_process == rank:
                 try:
@@ -100,6 +100,12 @@ class ScoreCounter:
         self.trie = Trie()
 
     def process_dict(self, file_name):
+        """
+        This function creates a dict trie based on the given dictionary file.
+
+        input: file_name (string), the file path of the dictionary file
+        output: None 
+        """
         with open(file_name) as f:
             for line in f:
                 line = line.strip()
@@ -112,46 +118,64 @@ class ScoreCounter:
                 self.trie.add_word(word, score)
     
     def countScore(self,sentence):
+        """
+        This function is used for calculating the sentiment socre of the given string.
+        The function examines the input string char by char and traverse the dict trie from the root, tries to find  
+        a furthest node containing a score that matches the current char in the string.
+        If there is no children node corresponding to the current char, it means there is no words to match 
+        
+        the function will restart to traverse from the root. 
+
+
+        input: sentence (string)
+        output: the score of the string (integer >= 0)
+        """
         sentence = sentence.lower()
         score = 0 
         matched_index = -1
         matched_score = 0 
         current_index = 0 
         word_len = 0
-        # has_match = False
+        next_starting_index = -1 
         exception = "\"\'‘’“”?! ,.，。"
         current_node = self.trie.root
         while current_index < len(sentence):
-            current_char = current_node.children.get(sentence[current_index]) 
-            if current_char is None :
+            current_char = sentence[current_index]
+            current_node = current_node.children.get(current_char) 
+
+            if current_node is None :
                 if matched_index != -1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception) and ( sentence[matched_index+1] in exception ):
-                    #print(sentence[matched_index-word_len+1: matched_index+1])
+        
                     score += matched_score
                     current_index = matched_index + 1 
                     matched_index = -1
 
                 else:
-                    if sentence[current_index-1] in exception and current_node!= self.trie.root:
-                        pass
+                    if next_starting_index != -1:
+                        current_index = next_starting_index
+                        next_starting_index = -1
+                    # if sentence[current_index-1] in exception and current_node!= self.trie.root:
+                    #     pass
                     else:
                         current_index +=1
                         while current_index < len(sentence) and (not (sentence[current_index-1] in exception)):
                             current_index +=1
                 current_node = self.trie.root
             else:
-                if current_char.is_word:
+                if current_node.is_word:
                     matched_index = current_index
-                    matched_score = current_char.score
-                    word_len = current_char.index
+                    matched_score = current_node.score
+                    word_len = current_node.index
                 
                     if current_index == len(sentence)-1 and (matched_index-word_len <0 or sentence[matched_index-word_len] in exception):
-                        #print(sentence[matched_index-word_len+1: matched_index+1])
                         score += matched_score
                 
-                current_index +=1
-                current_node = current_char
-        return score
+                if current_char.isspace() and next_starting_index == -1:
+                    next_starting_index = current_index + 1 
 
+                current_index +=1
+              
+        return score
 
 
 def main(argv):
@@ -160,15 +184,14 @@ def main(argv):
     size = comm.Get_size()
     rank = comm.Get_rank()
 
-    # runtime = MPI.Wtime()
     #all processes need to process the grid & dict information 
     grids = parse_grid("melbGrid.json")
     counter = ScoreCounter()
     counter.process_dict("AFINN.txt")
-    sta = process_tweets(argv[0], rank, size, grids, counter)
+    sta = process_tweets(argv[0], rank, size, grids, counter) # process tweets 
 
     if rank == 0: # master process
-        # print("this is rank: ", rank )
+        #collect data from other processors and integrate the results
         for i in range(1, size):
             partial_sta = comm.recv(source=i)
             for key in partial_sta:
@@ -176,18 +199,15 @@ def main(argv):
                 partial = partial_sta.get(key)
                 sta[key] = [prev[0] + partial[0], prev[1] + partial[1]] 
         
-        # runtime = MPI.Wtime() - runtime
-        #print final results
-        print("Cell      ","#Total Tweets      ", "#Overal Sentiment Score")
+        #output final results
+        print ("{:<8} {:<15} {:<15} ".format('Cell','#Total Tweets ','#Overal Sentiment Score'))
         for key in sorted(sta):
             value = sta.get(key)
-            print(key, "            ", value[0], "                             ",  value[1])
+            print ("{:<8} {:<15} {:<15} ".format(key,value[0], value[1]))
         
-        # print("Total run time: ", runtime, " seconds.")
 
-    else:
-        # print("this is rank: ", rank )
-        comm.send(sta, dest=0)
+    else:#other processes
+        comm.send(sta, dest=0) #send the statistical data to the root (rank 0 ) 
     
 
 
